@@ -1,0 +1,248 @@
+import os
+import random
+import numpy as np
+import pandas as pd 
+from skimage import io
+from skimage import color
+from PIL import Image
+from IPython.display import display
+import matplotlib.pyplot as plt
+import seaborn as sns
+from dask.array.image import imread
+#from dask import bag, threaded
+from dask.diagnostics import ProgressBar
+import cv2
+from sklearn.model_selection import train_test_split
+import warnings
+warnings.filterwarnings("ignore")
+--------------------------------------------------------------------------------
+import keras
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Flatten
+from keras.layers import Conv2D, MaxPooling2D
+#from keras.utils import to_categorical
+from tensorflow.keras.utils import to_categorical
+from keras.preprocessing import image 
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras import optimizers
+from tensorflow.keras.optimizers import Adam
+import tensorflow as tf
+import tensorflow_datasets as tfds
+
+# getting one image per label
+f, ax = plt.subplots(1,10, figsize = (120,120))
+for i in range(10):
+  #print('now we are in the folder C',i)
+    labels = imread("/content/drive/MyDrive/kaggle/imgs/train/c"+str(i)+"/*.jpg")
+    for j in range(1):
+        img = labels[j]
+        label = i
+        ax[i].imshow(img)
+        ax[i].set_title('C'+str(i))
+        plt.show
+        
+f, ax = plt.subplots(1,10, figsize = (120,120))
+for i in range(10):
+  #print('now we are in the folder C',i)
+    labels = imread("/content/drive/MyDrive/kaggle/imgs/train/c"+str(i)+"/*.jpg")
+    for j in range(1):
+        img = labels[j]
+        img = color.rgb2gray(img)
+        img = img[50:,120:-50]
+        label = i
+        ax[i].imshow(img,cmap='gray')
+        ax[i].set_title('C'+str(i))
+        plt.show
+        
+ 
+ train_image = []
+image_label = []
+
+
+for i in range(10):
+    print('now we are in the folder C',i)
+    labels = imread("/content/drive/MyDrive/kaggle/imgs/train/c"+str(i)+"/*.jpg")
+    #for j in range(len(labels)):
+    for j in range(500):
+        img = labels[j]
+        img = color.rgb2gray(img)
+        img = img[50:,120:-50]
+        img = cv2.resize(img,(224,224))
+        label = i
+        train_image.append([img,label])
+        image_label.append(i)
+        
+## Randomly shuffling the images
+
+import random
+random.shuffle(train_image)
+
+## Splitting the image and label to two different lists
+
+X = []
+Y = []
+for features,labels in train_image:
+    X.append(features)
+    Y.append(labels)
+
+print (len(X), len(Y))
+
+
+plt.imshow(X[5],cmap= 'gray')
+plt.show()
+print(Y[5])
+
+
+
+## Converting images to nparray. Encoding the Y
+
+X = np.array(X).reshape(-1,224,224,1)
+Y = to_categorical(Y)
+
+# X2 = cv2.merge([X,X,X])
+# X2 = np.array(X2).reshape(-1,224,224,3)
+# print (X2.shape)
+print (X.shape)
+
+
+
+print(Y[5])
+
+## # Verinin test ve train olarak parçalara ayrılması
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, random_state=5, test_size=0.3)
+
+
+from tensorflow.keras.optimizers import Adam
+model = Sequential()
+
+model.add(Conv2D(32, kernel_size=(3, 3),activation='relu',input_shape=(224,224,1),padding = 'same'))
+model.add(BatchNormalization())
+
+model.add(MaxPooling2D(pool_size=(2, 2)))
+
+model.add(Conv2D(64,kernel_size = (3,3),activation = 'relu',padding = 'same'))
+model.add(BatchNormalization())
+
+model.add(Conv2D(64,kernel_size = (3,3),activation = 'relu',padding = 'same'))
+model.add(BatchNormalization())
+
+model.add(MaxPooling2D(pool_size=(2, 2)))
+
+model.add(Conv2D(128,kernel_size = (3,3),activation = 'relu',padding = 'same'))
+model.add(BatchNormalization())
+
+model.add(Flatten())
+
+model.add(Dense(128, activation = 'relu'))
+
+
+model.add(Dense(10, activation='softmax'))
+
+sgd = optimizers.SGD(lr = 0.001)
+model.compile(loss='categorical_crossentropy',optimizer=sgd,metrics=['accuracy'])
+#model.compile(loss='categorical_crossentropy',
+              #optimizer=optimizers.Adam(learning_rate=0.001),
+             # metrics=['accuracy'])
+             
+             
+## Fitting the model
+
+history = model.fit(X_train, Y_train, epochs=5, validation_data=(X_test, Y_test))
+
+# Get training and test loss histories
+training_loss_history = history.history['loss']
+test_loss_history = history.history['val_loss']
+print (training_loss_history,test_loss_history)
+
+
+# Get training and test loss histories
+training_acc_history = history.history['accuracy']
+test_acc_history = history.history['val_accuracy']
+print (training_acc_history,test_acc_history)
+
+
+
+# Printing the test results.
+test_loss, test_acc = model.evaluate(X_test,Y_test, verbose=0, steps=5)
+print('---------------------------')
+print('test loss:', test_loss)
+print('test acc:', test_acc)
+print('---------------------------')
+
+
+tags = { "C0": "safe driving",
+"C1": "texting - right",
+"C2": "talking on the phone - right",
+"C3": "texting - left",
+"C4": "talking on the phone - left",
+"C5": "operating the radio",
+"C6": "drinking",
+"C7": "reaching behind",
+"C8": "hair and makeup",
+"C9": "talking to passenger" }
+
+
+
+
+# labels is the image array
+test_image = []
+i = 0
+fig, ax = plt.subplots(1, 10, figsize = (50,50 ))
+
+files = os.listdir('/content/drive/MyDrive/kaggle/imgs/test/')
+nums = np.random.randint(low=1, high=len(files), size=10)
+for i in range(10):
+    print ('Image number:',i)
+    img = cv2.imread('/content/drive/MyDrive/kaggle/imgs/test/'+files[nums[i]])
+    img = color.rgb2gray(img)
+    ##img = img[100:,300:-50]
+    img = cv2.resize(img,(224,224))
+    test_image.append(img)
+    ax[i].imshow(img,cmap = 'gray')
+    plt.show
+    
+    
+test = []
+
+for img in test_image:
+    test.append(img)
+
+test = np.array(test).reshape(-1,224,224,1)
+prediction = model.predict(test)
+
+
+
+prediction[1]
+# labels is the image array
+i = 0
+fig, ax = plt.subplots(10, 1, figsize = (50,50 ))
+
+for i in range(10):
+    ax[i].imshow(test[i].squeeze(),cmap = 'gray')
+    predicted_class = 'C'+str(np.where(prediction[i] == np.amax(prediction[i]))[0][0])
+    ax[i].set_title(tags[predicted_class])
+    plt.show
+    
+# Create count of the number of epochs
+epoch_count = range(1, len(training_loss_history)+1)
+# print(epoch_count)
+
+# Visualize loss history
+plt.figure()
+plt.subplot(1,2,1)
+plt.plot(epoch_count, training_loss_history, 'r.-')
+plt.plot(epoch_count, test_loss_history, 'b.-')
+plt.title('Loss-Epochs Graph')
+plt.legend(['Training Loss','Test Loss'])
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+
+plt.subplot(1,2,2)
+plt.plot(epoch_count, training_acc_history, 'r.-')
+plt.plot(epoch_count, test_acc_history, 'b.-')
+plt.title('Accuracy-Epochs Graph')
+plt.legend(['Training Accuracy','Test Accuracy'])
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+
+plt.show();
